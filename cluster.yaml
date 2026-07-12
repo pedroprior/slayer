@@ -1,0 +1,26 @@
+name: talos-homelab
+iso:
+  src: /tmp/metal-amd64.iso
+  dest: /var/lib/libvirt/images/metal-amd64.iso
+libvirt:
+  network: default
+  diskDir: /var/lib/libvirt/images
+controlPlane:
+  count: 3
+  ramMB: 4096
+  vcpus: 2
+  diskGB: 30
+worker:
+  count: 3
+  ramMB: 4096
+  vcpus: 2
+  diskGB: 40
+network:
+  subnet: 192.168.122.0/24
+  gateway: 192.168.122.1
+  netmask: 255.255.255.0
+  dhcpStart: 192.168.122.2
+  dhcpEnd: 192.168.122.149
+  controlPlaneVIP: 192.168.122.100
+  metalLBRangeStart: 192.168.122.150
+  metalLBRangeEnd: 192.168.122.199
