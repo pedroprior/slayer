@@ -3,7 +3,6 @@ talos/talosconfig
 talos/controlplane.yaml
 talos/worker.yaml
 talos/*.qcow2
-talos/
 
 /clusterctl
 
