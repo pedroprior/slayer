@@ -8,7 +8,7 @@ TALOS_ISO_PATH := /var/lib/libvirt/images/metal-amd64.iso
 
 .PHONY: help build install test test-shell vet fmt tidy clean \
         download-talos-iso provision bootstrap addons status stop destroy \
-        kubeconfig nodes cluster-info
+        kubeconfig install-kubeconfig nodes cluster-info
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -69,6 +69,19 @@ destroy: build ## Stop and undefine all cluster VMs (DESTRUCTIVE, requires confi
 
 kubeconfig: ## Print the export command for KUBECONFIG
 	@echo "export KUBECONFIG=$(CURDIR)/$(KUBECONFIG_FILE)"
+
+install-kubeconfig: ## Merge talos/kubeconfig into ~/.kube/config and set it as current-context (backs up any existing ~/.kube/config)
+	@mkdir -p $(HOME)/.kube
+	@ctx=$$(KUBECONFIG=$(KUBECONFIG_FILE) kubectl config current-context); \
+	if [ -f $(HOME)/.kube/config ]; then \
+		cp $(HOME)/.kube/config $(HOME)/.kube/config.bak.$$(date +%Y%m%d%H%M%S); \
+		KUBECONFIG=$(HOME)/.kube/config:$(KUBECONFIG_FILE) kubectl config view --flatten > $(HOME)/.kube/config.new; \
+		mv $(HOME)/.kube/config.new $(HOME)/.kube/config; \
+	else \
+		cp $(KUBECONFIG_FILE) $(HOME)/.kube/config; \
+	fi; \
+	KUBECONFIG=$(HOME)/.kube/config kubectl config use-context $$ctx >/dev/null; \
+	echo "Merged $(KUBECONFIG_FILE) into $(HOME)/.kube/config, current-context set to $$ctx"
 
 nodes: ## List cluster nodes (requires KUBECONFIG exported)
 	KUBECONFIG=$(KUBECONFIG_FILE) kubectl get nodes -o wide

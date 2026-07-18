@@ -1,0 +1,10 @@
+# whoami-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: whoami
+spec:
+  ports:
+    - port: 80
+  selector:
+    app: whoami
