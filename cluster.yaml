@@ -15,6 +15,7 @@ worker:
   ramMB: 4096
   vcpus: 2
   diskGB: 40
+  osdDiskGB: 0
 network:
   subnet: 192.168.122.0/24
   gateway: 192.168.122.1

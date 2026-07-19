@@ -118,7 +118,8 @@ worker:
   count: 3
   ramMB: 4096
   vcpus: 2
-  diskGB: 40                       # bump if Rook-Ceph OSDs will live here
+  diskGB: 40                       # OS/install disk
+  osdDiskGB: 0                     # raw disk for Rook-Ceph OSDs (0/omit = none)
 network:
   subnet: 192.168.122.0/24
   gateway: 192.168.122.1

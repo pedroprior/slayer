@@ -77,6 +77,32 @@ func TestBuildDomainXML_OmitsGraphicsElement(t *testing.T) {
 	}
 }
 
+func TestBuildDomainXML_IncludesOSDDiskWhenSet(t *testing.T) {
+	spec := testSpec()
+	spec.OSDDiskGB = 40
+	xml := buildDomainXML(spec)
+
+	for _, want := range []string{
+		`<target dev="vdb" bus="virtio"/>`,
+		`/var/lib/libvirt/images/talos-cp-01-osd.qcow2`,
+	} {
+		if !strings.Contains(xml, want) {
+			t.Errorf("buildDomainXML() missing %q in:\n%s", want, xml)
+		}
+	}
+}
+
+// Regression test: OSDDiskGB is 0 by default (control-plane nodes, and
+// worker nodes provisioned before this field existed), so no vdb stanza
+// should be rendered and existing single-disk domains stay unaffected.
+func TestBuildDomainXML_OmitsOSDDiskWhenUnset(t *testing.T) {
+	xml := buildDomainXML(testSpec())
+
+	if strings.Contains(xml, "vdb") {
+		t.Errorf("buildDomainXML() must not include a vdb disk when OSDDiskGB is 0, got:\n%s", xml)
+	}
+}
+
 // fakeDomainClient is an in-memory stand-in for a libvirtd connection,
 // implementing domainLifecycler so EnsureDomain/Stop's branching logic can be
 // tested without a real libvirt daemon.

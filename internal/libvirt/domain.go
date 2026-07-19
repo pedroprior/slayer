@@ -16,6 +16,7 @@ type DomainSpec struct {
 	DiskDir     string
 	ISOPath     string
 	NetworkName string
+	OSDDiskGB   int
 	// MAC is the hardware address to assign the domain's single NIC. Set it
 	// via DeterministicMAC so the address is stable across recreations and
 	// callers (e.g. Talos VIP device selectors) can address the interface
@@ -25,6 +26,18 @@ type DomainSpec struct {
 
 func buildDomainXML(spec DomainSpec) string {
 	diskPath := fmt.Sprintf("%s/%s.qcow2", spec.DiskDir, spec.Name)
+
+	var osdDisk string
+	if spec.OSDDiskGB > 0 {
+		osdDiskPath := fmt.Sprintf("%s/%s-osd.qcow2", spec.DiskDir, spec.Name)
+		osdDisk = fmt.Sprintf(`
+    <disk type="file" device="disk">
+      <driver name="qemu" type="qcow2"/>
+      <source file="%s"/>
+      <target dev="vdb" bus="virtio"/>
+    </disk>`, osdDiskPath)
+	}
+
 	return fmt.Sprintf(`<domain type="kvm">
   <name>%s</name>
   <memory unit="MiB">%d</memory>
@@ -44,7 +57,7 @@ func buildDomainXML(spec DomainSpec) string {
       <driver name="qemu" type="qcow2"/>
       <source file="%s"/>
       <target dev="vda" bus="virtio"/>
-    </disk>
+    </disk>%s
     <disk type="file" device="cdrom">
       <driver name="qemu" type="raw"/>
       <source file="%s"/>
@@ -58,7 +71,7 @@ func buildDomainXML(spec DomainSpec) string {
     </interface>
     <console type="pty"/>
   </devices>
-</domain>`, spec.Name, spec.RAMMB, spec.VCPUs, diskPath, spec.ISOPath, spec.NetworkName, spec.MAC)
+</domain>`, spec.Name, spec.RAMMB, spec.VCPUs, diskPath, osdDisk, spec.ISOPath, spec.NetworkName, spec.MAC)
 }
 
 // domainLifecycler is the subset of the libvirt RPC API used by EnsureDomain
