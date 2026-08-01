@@ -3,8 +3,8 @@ package cluster
 import (
 	"time"
 
-	"clusterctl/internal/config"
-	"clusterctl/internal/libvirt"
+	"slayer/internal/config"
+	"slayer/internal/libvirt"
 )
 
 // Stop gracefully shuts down every expected control-plane and worker domain,

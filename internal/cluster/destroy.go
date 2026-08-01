@@ -5,8 +5,8 @@ import (
 
 	golibvirt "github.com/digitalocean/go-libvirt"
 
-	"clusterctl/internal/config"
-	"clusterctl/internal/libvirt"
+	"slayer/internal/config"
+	"slayer/internal/libvirt"
 )
 
 func collectErrors(errs ...error) []error {

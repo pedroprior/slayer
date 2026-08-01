@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"clusterctl/internal/config"
-	"clusterctl/internal/talos"
+	"slayer/internal/config"
+	"slayer/internal/talos"
 )
 
 // Bootstrap generates Talos machine configs, applies them to every

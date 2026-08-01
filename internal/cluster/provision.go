@@ -5,8 +5,8 @@ import (
 	"log"
 	"time"
 
-	"clusterctl/internal/config"
-	"clusterctl/internal/libvirt"
+	"slayer/internal/config"
+	"slayer/internal/libvirt"
 )
 
 type NodeResult struct {

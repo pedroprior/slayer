@@ -3,7 +3,7 @@
 ## Purpose
 
 Rook-Ceph needs a raw, unformatted block device per node to create OSDs on.
-Today `clusterctl provision` gives every VM exactly one disk, used as the
+Today `slayer provision` gives every VM exactly one disk, used as the
 Talos install/root disk (`internal/libvirt/domain.go`, `disk.go`). This
 change adds an optional second disk to worker VMs, sized independently from
 the OS disk, so a future Rook-Ceph `CephCluster` CR has something to claim.
@@ -91,7 +91,7 @@ against live libvirtd, not pure logic).
 ## Out of scope
 
 - Anything Rook/Ceph-side (operator manifests, `CephCluster` CR, wiring
-  into `clusterctl addons`) — separate follow-up once this disk exists.
+  into `slayer addons`) — separate follow-up once this disk exists.
 - Talos machine-config changes to expose `/dev/vdb` to workloads — Talos
   discovers block devices automatically; no machine-config change is
   expected to be needed, but this is unverified until tested against a

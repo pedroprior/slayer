@@ -1,7 +1,7 @@
 # Vendored, pinned upstream MetalLB manifest — installs the MetalLB
 # CRDs, controller, speaker DaemonSet, and validating webhook that
 # manifests/metal-lb.yaml.tmpl's IPAddressPool/L2Advertisement CRs
-# depend on. Pinned rather than fetched at runtime so `clusterctl
+# depend on. Pinned rather than fetched at runtime so `slayer
 # addons` works offline and reproducibly.
 #
 # Source: https://raw.githubusercontent.com/metallb/metallb/v0.16.0/config/manifests/metallb-native.yaml

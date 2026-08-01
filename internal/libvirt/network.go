@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"clusterctl/internal/config"
+	"slayer/internal/config"
 )
 
 func buildNetworkXML(net config.NetworkConfig) string {

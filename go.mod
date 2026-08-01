@@ -1,4 +1,4 @@
-module clusterctl
+module slayer
 
 go 1.26.5
 

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"clusterctl/internal/config"
-	"clusterctl/internal/libvirt"
+	"slayer/internal/config"
+	"slayer/internal/libvirt"
 )
 
 type NodeStatus struct {

@@ -1,5 +1,5 @@
 SHELL := /usr/bin/env bash
-BIN         := clusterctl
+BIN         := slayer
 CONFIG      := cluster.yaml
 TALOS_DIR   := talos
 KUBECONFIG_FILE := $(TALOS_DIR)/kubeconfig
@@ -13,11 +13,11 @@ TALOS_ISO_PATH := /var/lib/libvirt/images/metal-amd64.iso
 help: ## Show this help
 	@grep -hE '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
 
-build: ## Build the clusterctl binary into ./bin
-	go build -o bin/$(BIN) ./cmd/clusterctl
+build: ## Build the slayer binary into ./bin
+	go build -o bin/$(BIN) ./cmd/slayer
 
-install: ## Install clusterctl to $GOPATH/bin
-	go install ./cmd/clusterctl
+install: ## Install slayer to $GOPATH/bin
+	go install ./cmd/slayer
 
 test: ## Run unit tests
 	go test ./...
@@ -37,7 +37,7 @@ tidy: ## Tidy go.mod/go.sum
 clean: ## Remove build artifacts
 	rm -rf bin
 
-## --- Cluster lifecycle (wraps clusterctl; requires libvirt/QEMU + talosctl) ---
+## --- Cluster lifecycle (wraps slayer; requires libvirt/QEMU + talosctl) ---
 
 download-talos-iso: ## Download Talos metal-amd64.iso into libvirt images dir (skips if already present)
 	@if [ -f $(TALOS_ISO_PATH) ]; then \
