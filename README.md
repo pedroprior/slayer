@@ -36,6 +36,10 @@ make nodes
 # Install MetalLB so LoadBalancer Services get real IPs
 make addons
 
+# Optional: install Rook-Ceph for PVC-backed storage (requires
+# worker.osdDiskGB set in cluster.yaml first)
+make ceph
+
 # Check on things later
 make status
 make cluster-info

@@ -7,7 +7,7 @@ TALOS_ISO_URL  := https://github.com/siderolabs/talos/releases/latest/download/m
 TALOS_ISO_PATH := /var/lib/libvirt/images/metal-amd64.iso
 
 .PHONY: help build install test test-shell vet fmt tidy clean \
-        download-talos-iso provision bootstrap addons status stop destroy \
+        download-talos-iso provision bootstrap addons ceph status stop destroy \
         kubeconfig install-kubeconfig nodes cluster-info
 
 help: ## Show this help
@@ -55,6 +55,9 @@ bootstrap: build ## Generate/apply Talos configs, bootstrap etcd, fetch kubeconf
 
 addons: build ## Apply Kubernetes addon manifests (MetalLB)
 	./bin/$(BIN) --config $(CONFIG) addons
+
+ceph: build ## Install Rook-Ceph and claim worker OSD disks for storage (requires worker.osdDiskGB set)
+	./bin/$(BIN) --config $(CONFIG) ceph
 
 status: build ## Show libvirt-level status of the cluster's VMs
 	./bin/$(BIN) --config $(CONFIG) status

@@ -36,13 +36,23 @@ func Bootstrap(ctx context.Context, cfg *config.Config, provisioned *ProvisionRe
 			return fmt.Errorf("applying VIP patch for %s (%s): %w", n.Name, n.IP, err)
 		}
 
+		patchedCPBytes, err = talos.ApplyHostnamePatch(patchedCPBytes, n.Name)
+		if err != nil {
+			return fmt.Errorf("applying hostname patch for %s (%s): %w", n.Name, n.IP, err)
+		}
+
 		if err := talos.ApplyConfig(ctx, n.IP, patchedCPBytes); err != nil {
 			return fmt.Errorf("applying control-plane config to %s (%s): %w", n.Name, n.IP, err)
 		}
 	}
 
 	for _, n := range provisioned.Worker {
-		if err := talos.ApplyConfig(ctx, n.IP, workerBytes); err != nil {
+		patchedWorkerBytes, err := talos.ApplyHostnamePatch(workerBytes, n.Name)
+		if err != nil {
+			return fmt.Errorf("applying hostname patch for %s (%s): %w", n.Name, n.IP, err)
+		}
+
+		if err := talos.ApplyConfig(ctx, n.IP, patchedWorkerBytes); err != nil {
 			return fmt.Errorf("applying worker config to %s (%s): %w", n.Name, n.IP, err)
 		}
 	}

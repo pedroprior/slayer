@@ -56,6 +56,8 @@ export_path.sh            # `export KUBECONFIG=.../talos/kubeconfig` one-liner
 manifests/
   metallb-native.yaml      # vendored, pinned upstream MetalLB install (CRDs, controller, speaker, webhook)
   metal-lb.yaml.tmpl       # IPAddressPool + L2Advertisement template, rendered from cluster.yaml's network config
+  rook-ceph-operator.yaml  # vendored, pinned upstream Rook install (CRDs, common RBAC, operator Deployment)
+  rook-ceph-cluster.yaml.tmpl # CephCluster + CephBlockPool + StorageClass template, rendered from cluster.yaml's worker count
 
 talos/
   controlplane.yaml         # generated Talos control-plane machine config
@@ -68,6 +70,7 @@ cmd/slayer/            # cobra CLI wiring — one file per subcommand
   provision.go                # `slayer provision`
   bootstrap.go                 # `slayer bootstrap`
   addons.go                     # `slayer addons`
+  ceph.go                        # `slayer ceph`
   status.go                      # `slayer status`
   stop.go                          # `slayer stop`
   destroy.go                      # `slayer destroy`
@@ -88,6 +91,7 @@ internal/
     provision.go                 # orchestrates libvirt network + VM creation for both node groups
     bootstrap.go                  # orchestrates config-gen -> apply -> etcd bootstrap -> kubeconfig fetch
     addons.go                      # installs MetalLB, renders + retry-applies the pool config from cluster.yaml
+    ceph.go                         # installs Rook, renders + retry-applies the CephCluster/pool/StorageClass from cluster.yaml
     status.go                       # libvirt-level running/IP report
     stop.go                          # graceful shutdown of all cluster domains, keeping them defined
     destroy.go                       # stop + undefine all cluster domains, deletes disk images
@@ -245,6 +249,49 @@ to re-run:
 > matter if workers are down; the fix is patching `speaker` (not
 > `controller`!) with `--ignore-exclude-lb`. `slayer addons` does not do
 > this patch automatically — it's a manual `kubectl patch` step today.
+
+### `slayer ceph`
+Installs Rook-Ceph and turns worker nodes' second raw disk (`/dev/vdb`, see
+`cluster.yaml`'s `worker.osdDiskGB` and
+`docs/superpowers/specs/2026-07-14-worker-osd-disk-design.md`) into usable
+Kubernetes storage. Refuses to run — before applying anything — if
+`cfg.Worker.OSDDiskGB` is 0, since there'd be no raw disk for OSDs to claim.
+
+1. Installs Rook from the vendored, version-pinned
+   `manifests/rook-ceph-operator.yaml` (CRDs, `rook-ceph` namespace/RBAC,
+   operator Deployment). Pinned to Rook v1.19.8 rather than the newer
+   v1.20.x line deliberately — v1.20 made a second "ceph-csi-operator"
+   (its own CRDs + Deployment) mandatory, which would mean two operators
+   and a CRD-ordering dependency between two vendored files. v1.19.8 still
+   supports classic in-operator CSI driver management via the
+   `ROOK_USE_CSI_OPERATOR` toggle, flipped to `"false"` in the vendored
+   copy (upstream default is `"true"`) — see that file's header comment for
+   upgrade instructions and what changes if a future pin removes classic
+   mode the way v1.20 did.
+2. Renders `manifests/rook-ceph-cluster.yaml.tmpl` — a `CephCluster` naming
+   every worker node (`talos-worker-01..NN`, from `cfg.Worker.Count`) with
+   device `vdb`, a `CephBlockPool` "replicapool", and a default RBD
+   `StorageClass` "rook-ceph-block" — and applies it, retrying up to 20
+   times / 3s apart. Retrying matters because these CRs can't be accepted
+   until Rook's CRDs (just installed in step 1) reach `Established`; the
+   first attempt failing is the expected common case, same as `addons`'s
+   MetalLB pool step.
+   - `mon.count` is 3 when there are >= 3 workers, else 1 (Ceph mons need an
+     odd quorum size).
+   - The pool's `replicated.size` is `min(3, worker count)` (`failureDomain:
+     host`, so it can't exceed the number of hosts). `requireSafeReplicaSize`
+     is disabled only when that clamps to 1 (a single-worker homelab
+     explicitly opting into no redundancy) — Ceph's own guard otherwise
+     rejects a size-1 pool outright.
+
+Returns once the CRs are accepted by the API server, **not** once Ceph
+reports `HEALTH_OK` — mons forming quorum and OSDs coming up takes real
+minutes. Poll `kubectl -n rook-ceph get cephcluster` for that.
+
+Out of scope today: Ceph dashboard, toolbox pod, CephFS, RGW object
+storage, Prometheus integration, and resizing/reshaping an already-installed
+`CephCluster` after `osdDiskGB` or `worker.count` changes (same caveat as
+the OSD-disk design's "no resize" note).
 
 ### `slayer status`
 For each expected control-plane/worker node name, looks it up in libvirt and

@@ -43,6 +43,7 @@ func main() {
 	rootCmd.AddCommand(newProvisionCmd())
 	rootCmd.AddCommand(newBootstrapCmd())
 	rootCmd.AddCommand(newAddonsCmd())
+	rootCmd.AddCommand(newCephCmd())
 	rootCmd.AddCommand(newStatusCmd())
 	rootCmd.AddCommand(newStopCmd())
 	rootCmd.AddCommand(newDestroyCmd())
