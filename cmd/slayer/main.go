@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"clusterctl/internal/config"
+	"slayer/internal/config"
 )
 
 var configPath string
@@ -14,7 +14,7 @@ var cfg *config.Config
 
 func main() {
 	rootCmd := &cobra.Command{
-		Use:   "clusterctl",
+		Use:   "slayer",
 		Short: "Provision and manage the baremetal Talos/Kubernetes homelab cluster",
 	}
 	rootCmd.PersistentFlags().StringVar(&configPath, "config", "cluster.yaml", "path to cluster.yaml config file")
@@ -33,9 +33,9 @@ func main() {
 
 	rootCmd.AddCommand(&cobra.Command{
 		Use:   "version",
-		Short: "Print the clusterctl version",
+		Short: "Print the slayer version",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Fprintln(cmd.OutOrStdout(), "clusterctl dev")
+			fmt.Fprintln(cmd.OutOrStdout(), "slayer dev")
 			return nil
 		},
 	})
@@ -43,6 +43,7 @@ func main() {
 	rootCmd.AddCommand(newProvisionCmd())
 	rootCmd.AddCommand(newBootstrapCmd())
 	rootCmd.AddCommand(newAddonsCmd())
+	rootCmd.AddCommand(newCephCmd())
 	rootCmd.AddCommand(newStatusCmd())
 	rootCmd.AddCommand(newStopCmd())
 	rootCmd.AddCommand(newDestroyCmd())

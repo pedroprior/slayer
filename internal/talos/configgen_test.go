@@ -66,3 +66,46 @@ func TestApplyVIPPatch(t *testing.T) {
 		t.Errorf("ApplyVIPPatch() output missing MAC device selector:\n%s", patched)
 	}
 }
+
+func TestBuildHostnamePatch(t *testing.T) {
+	patch := BuildHostnamePatch("talos-worker-01")
+
+	if !strings.Contains(patch, "hostname: talos-worker-01") {
+		t.Errorf("BuildHostnamePatch() missing hostname in:\n%s", patch)
+	}
+}
+
+func TestApplyHostnamePatch(t *testing.T) {
+	secretsBundle, err := secrets.NewBundle(secrets.NewClock(), nil)
+	if err != nil {
+		t.Fatalf("generating secrets bundle: %v", err)
+	}
+
+	input, err := generate.NewInput("test-cluster", "https://192.168.122.250:6443", "", generate.WithSecretsBundle(secretsBundle))
+	if err != nil {
+		t.Fatalf("building generate input: %v", err)
+	}
+
+	workerProvider, err := input.Config(machine.TypeWorker)
+	if err != nil {
+		t.Fatalf("generating worker config: %v", err)
+	}
+
+	workerBytes, err := workerProvider.Bytes()
+	if err != nil {
+		t.Fatalf("marshaling worker config: %v", err)
+	}
+
+	patched, err := ApplyHostnamePatch(workerBytes, "talos-worker-01")
+	if err != nil {
+		t.Fatalf("ApplyHostnamePatch() returned error: %v", err)
+	}
+
+	if _, err := configloader.NewFromBytes(patched); err != nil {
+		t.Errorf("ApplyHostnamePatch() output is not a valid single Talos config document: %v", err)
+	}
+
+	if !strings.Contains(string(patched), "hostname: talos-worker-01") {
+		t.Errorf("ApplyHostnamePatch() output missing hostname:\n%s", patched)
+	}
+}

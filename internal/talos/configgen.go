@@ -31,6 +31,51 @@ func BuildVIPPatch(vip, mac string) string {
 `, mac, vip)
 }
 
+// BuildHostnamePatch pins the node's Kubernetes/system hostname to name
+// instead of Talos's default "auto: stable" generated hostname. Without
+// this, the k8s Node object registers under a random-looking generated
+// name (e.g. "talos-3zc-2pl") rather than the VM's domain name, which
+// breaks anything that references nodes by the names slayer provisioned
+// them under — e.g. the CephCluster storage.nodes list (see
+// internal/cluster/ceph.go), which is built from those domain names.
+//
+// generate.NewInput emits a separate "HostnameConfig" document with `auto:
+// stable` alongside the main v1alpha1 Config document. Talos rejects a
+// config that sets machine.network.hostname while that document is still
+// present ("static hostname is already set in v1alpha1 config"), so the
+// patch must delete it rather than just setting the static hostname.
+func BuildHostnamePatch(name string) string {
+	return fmt.Sprintf(`machine:
+  network:
+    hostname: %s
+---
+apiVersion: v1alpha1
+kind: HostnameConfig
+$patch: delete
+`, name)
+}
+
+// ApplyHostnamePatch strategic-merges a hostname patch into cfgBytes, the
+// same way ApplyVIPPatch does for the VIP patch.
+func ApplyHostnamePatch(cfgBytes []byte, name string) ([]byte, error) {
+	patch, err := configpatcher.LoadPatch([]byte(BuildHostnamePatch(name)))
+	if err != nil {
+		return nil, fmt.Errorf("loading hostname patch: %w", err)
+	}
+
+	out, err := configpatcher.Apply(configpatcher.WithBytes(cfgBytes), []configpatcher.Patch{patch})
+	if err != nil {
+		return nil, fmt.Errorf("applying hostname patch: %w", err)
+	}
+
+	patched, err := out.Bytes()
+	if err != nil {
+		return nil, fmt.Errorf("marshaling patched config: %w", err)
+	}
+
+	return patched, nil
+}
+
 // GenerateConfigs produces (or reuses, if already on disk) the Talos
 // control-plane and worker machine configs plus the talosctl client config
 // (talosconfig) for clusterName/endpoint, writing them to

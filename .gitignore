@@ -4,7 +4,7 @@ talos/controlplane.yaml
 talos/worker.yaml
 talos/*.qcow2
 
-/clusterctl
+/slayer
 
 .claude/
 bin/

@@ -54,7 +54,7 @@ func splitYAMLDocuments(data []byte) ([][]byte, error) {
 
 // ApplyManifest server-side-applies every document in the file at
 // manifestPath against the cluster referenced by kubeconfigPath, using field
-// manager "clusterctl" so re-running is idempotent.
+// manager "slayer" so re-running is idempotent.
 func ApplyManifest(ctx context.Context, kubeconfigPath, manifestPath string) error {
 	data, err := os.ReadFile(manifestPath)
 	if err != nil {
@@ -70,7 +70,7 @@ func ApplyManifest(ctx context.Context, kubeconfigPath, manifestPath string) err
 // ApplyManifestBytes server-side-applies every document in a multi-document
 // YAML blob (e.g. one rendered from a template rather than read verbatim
 // from disk) against the cluster referenced by kubeconfigPath, using field
-// manager "clusterctl" so re-running is idempotent.
+// manager "slayer" so re-running is idempotent.
 func ApplyManifestBytes(ctx context.Context, kubeconfigPath string, data []byte) error {
 	restCfg, err := clientcmd.BuildConfigFromFlags("", kubeconfigPath)
 	if err != nil {
@@ -108,7 +108,7 @@ func ApplyManifestBytes(ctx context.Context, kubeconfigPath string, data []byte)
 		}
 
 		_, err = dynClient.Resource(mapping.Resource).Namespace(obj.GetNamespace()).Apply(
-			ctx, obj.GetName(), obj, metav1.ApplyOptions{FieldManager: "clusterctl", Force: true},
+			ctx, obj.GetName(), obj, metav1.ApplyOptions{FieldManager: "slayer", Force: true},
 		)
 		if err != nil {
 			return fmt.Errorf("applying %s/%s: %w", gvk.Kind, obj.GetName(), err)

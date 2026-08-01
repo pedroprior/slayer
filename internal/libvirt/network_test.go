@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"clusterctl/internal/config"
+	"slayer/internal/config"
 )
 
 func TestBuildNetworkXML(t *testing.T) {

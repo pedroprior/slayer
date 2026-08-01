@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"clusterctl/internal/cluster"
+	"slayer/internal/cluster"
 )
 
 func newAddonsCmd() *cobra.Command {

@@ -8,8 +8,8 @@ import (
 	"text/template"
 	"time"
 
-	"clusterctl/internal/config"
-	"clusterctl/internal/k8s"
+	"slayer/internal/config"
+	"slayer/internal/k8s"
 )
 
 const (

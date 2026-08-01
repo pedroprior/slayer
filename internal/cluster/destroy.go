@@ -5,8 +5,8 @@ import (
 
 	golibvirt "github.com/digitalocean/go-libvirt"
 
-	"clusterctl/internal/config"
-	"clusterctl/internal/libvirt"
+	"slayer/internal/config"
+	"slayer/internal/libvirt"
 )
 
 func collectErrors(errs ...error) []error {
@@ -35,7 +35,12 @@ func destroyNode(c *libvirt.Client, diskDir, name string) error {
 	// PKI already installed on it.
 	diskErr := c.DeleteDisk(diskDir, name)
 
-	errs := collectErrors(destroyErr, undefineErr, diskErr)
+	// Also remove the OSD disk unconditionally: DeleteDisk is a no-op when
+	// the volume doesn't exist, so this is harmless for control-plane nodes
+	// and workers provisioned before osdDiskGB existed.
+	osdDiskErr := c.DeleteDisk(diskDir, name+"-osd")
+
+	errs := collectErrors(destroyErr, undefineErr, diskErr, osdDiskErr)
 	if len(errs) > 0 {
 		return fmt.Errorf("destroying %s: %v", name, errs)
 	}

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"clusterctl/internal/config"
+	"slayer/internal/config"
 )
 
 // chdirRepoRoot points the working directory at the repo root for the

@@ -18,10 +18,11 @@ type LibvirtConfig struct {
 }
 
 type NodeGroup struct {
-	Count  int `yaml:"count"`
-	RAMMB  int `yaml:"ramMB"`
-	VCPUs  int `yaml:"vcpus"`
-	DiskGB int `yaml:"diskGB"`
+	Count     int `yaml:"count"`
+	RAMMB     int `yaml:"ramMB"`
+	VCPUs     int `yaml:"vcpus"`
+	DiskGB    int `yaml:"diskGB"`
+	OSDDiskGB int `yaml:"osdDiskGB"`
 }
 
 type NetworkConfig struct {

@@ -5,8 +5,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"clusterctl/internal/cluster"
-	"clusterctl/internal/libvirt"
+	"slayer/internal/cluster"
+	"slayer/internal/libvirt"
 )
 
 func newProvisionCmd() *cobra.Command {

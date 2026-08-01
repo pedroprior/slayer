@@ -5,8 +5,8 @@ import (
 	"log"
 	"time"
 
-	"clusterctl/internal/config"
-	"clusterctl/internal/libvirt"
+	"slayer/internal/config"
+	"slayer/internal/libvirt"
 )
 
 type NodeResult struct {
@@ -40,10 +40,16 @@ func provisionGroup(c *libvirt.Client, cfg *config.Config, names []string, group
 			DiskDir:     cfg.Libvirt.DiskDir,
 			ISOPath:     cfg.ISO.Dest,
 			NetworkName: cfg.Libvirt.Network,
+			OSDDiskGB:   group.OSDDiskGB,
 			MAC:         mac,
 		}
 		if err := c.EnsureDisk(cfg.Libvirt.DiskDir, name, group.DiskGB); err != nil {
 			return nil, fmt.Errorf("provisioning %s: %w", name, err)
+		}
+		if group.OSDDiskGB > 0 {
+			if err := c.EnsureDisk(cfg.Libvirt.DiskDir, name+"-osd", group.OSDDiskGB); err != nil {
+				return nil, fmt.Errorf("provisioning %s: %w", name, err)
+			}
 		}
 
 		log.Printf("ensuring domain %s (%dMB RAM, %d vCPU)", name, group.RAMMB, group.VCPUs)

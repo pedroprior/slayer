@@ -1,6 +1,6 @@
-# baremetal-k8s / clusterctl
+# baremetal-k8s / slayer
 
-A Go CLI (`clusterctl`) that provisions a highly-available **Talos Linux**
+A Go CLI (`slayer`) that provisions a highly-available **Talos Linux**
 Kubernetes cluster on **libvirt/QEMU**, entirely from declarative config —
 no state file, no SSH, everything re-derived live from libvirt and Talos on
 every run.
@@ -25,7 +25,7 @@ libvirt/QEMU (host)
 - **OS**: [Talos Linux](https://www.talos.dev/) — immutable, API-managed
   (no shell, no package manager). Configured entirely via YAML "machine
   configs" pushed over gRPC with `talosctl`/the Talos Go client.
-- **Provisioner**: `clusterctl`, a Go binary built on native
+- **Provisioner**: `slayer`, a Go binary built on native
   [`go-libvirt`](https://github.com/digitalocean/go-libvirt), the Talos
   machinery client, and `client-go`'s dynamic client — no shelling out to
   `virsh`/`talosctl`/`kubectl` binaries.
@@ -47,7 +47,7 @@ libvirt/QEMU (host)
 
 ```
 cluster.yaml              # the cluster's declarative config (topology, network ranges)
-go.mod / go.sum           # Go module: clusterctl
+go.mod / go.sum           # Go module: slayer
 Makefile                  # build/test/lifecycle wrapper (see §5)
 LEARNINGS.md              # conceptual notes / gotchas
 script.sh                 # original bash prototype this CLI replaced (bootstraps everything by shelling out to virt-install/talosctl)
@@ -56,6 +56,8 @@ export_path.sh            # `export KUBECONFIG=.../talos/kubeconfig` one-liner
 manifests/
   metallb-native.yaml      # vendored, pinned upstream MetalLB install (CRDs, controller, speaker, webhook)
   metal-lb.yaml.tmpl       # IPAddressPool + L2Advertisement template, rendered from cluster.yaml's network config
+  rook-ceph-operator.yaml  # vendored, pinned upstream Rook install (CRDs, common RBAC, operator Deployment)
+  rook-ceph-cluster.yaml.tmpl # CephCluster + CephBlockPool + StorageClass template, rendered from cluster.yaml's worker count
 
 talos/
   controlplane.yaml         # generated Talos control-plane machine config
@@ -63,14 +65,15 @@ talos/
   talosconfig                 # generated talosctl client config (endpoints/certs)
   kubeconfig                   # generated admin kubeconfig for the cluster
 
-cmd/clusterctl/            # cobra CLI wiring — one file per subcommand
+cmd/slayer/            # cobra CLI wiring — one file per subcommand
   main.go                    # root command, --config flag, loads cluster.yaml
-  provision.go                # `clusterctl provision`
-  bootstrap.go                 # `clusterctl bootstrap`
-  addons.go                     # `clusterctl addons`
-  status.go                      # `clusterctl status`
-  stop.go                          # `clusterctl stop`
-  destroy.go                      # `clusterctl destroy`
+  provision.go                # `slayer provision`
+  bootstrap.go                 # `slayer bootstrap`
+  addons.go                     # `slayer addons`
+  ceph.go                        # `slayer ceph`
+  status.go                      # `slayer status`
+  stop.go                          # `slayer stop`
+  destroy.go                      # `slayer destroy`
 
 internal/
   config/config.go           # cluster.yaml schema + Load()/Validate()
@@ -88,6 +91,7 @@ internal/
     provision.go                 # orchestrates libvirt network + VM creation for both node groups
     bootstrap.go                  # orchestrates config-gen -> apply -> etcd bootstrap -> kubeconfig fetch
     addons.go                      # installs MetalLB, renders + retry-applies the pool config from cluster.yaml
+    ceph.go                         # installs Rook, renders + retry-applies the CephCluster/pool/StorageClass from cluster.yaml
     status.go                       # libvirt-level running/IP report
     stop.go                          # graceful shutdown of all cluster domains, keeping them defined
     destroy.go                       # stop + undefine all cluster domains, deletes disk images
@@ -118,7 +122,8 @@ worker:
   count: 3
   ramMB: 4096
   vcpus: 2
-  diskGB: 40                       # bump if Rook-Ceph OSDs will live here
+  diskGB: 40                       # OS/install disk
+  osdDiskGB: 0                     # raw disk for Rook-Ceph OSDs (0/omit = none)
 network:
   subnet: 192.168.122.0/24
   gateway: 192.168.122.1
@@ -140,7 +145,7 @@ Validation (`Config.Validate`) enforces: `controlPlane.count >= 1`,
 automatically as `talos-cp-01..NN` / `talos-worker-01..NN` (zero-padded,
 `internal/cluster.nodeNames`) — not configurable per-node.
 
-Every `clusterctl` subcommand accepts `--config <path>` (default
+Every `slayer` subcommand accepts `--config <path>` (default
 `cluster.yaml`) via the persistent root flag in `main.go`.
 
 ---
@@ -151,7 +156,7 @@ All commands talk to libvirt over `qemu:///system` (the system-wide libvirtd
 socket — requires the invoking user to be in the `libvirt` group or run as
 root).
 
-### `clusterctl provision`
+### `slayer provision`
 Ensures the libvirt `default` network exists (defining it with the
 configured DHCP range if missing — left untouched if it already exists), then
 for each control-plane and worker node: ensures its qcow2 disk image exists
@@ -168,7 +173,7 @@ that are currently shut off, but leaves already-running VMs — and their disks
 — untouched (`EnsureDomain`/`EnsureDisk`) — so `provision` also doubles as
 "start" after a `stop`.
 
-### `clusterctl bootstrap`
+### `slayer bootstrap`
 1. Re-runs `Provision` internally to get current node IPs (and MACs — see
    below) live (no trust in a prior run's output — see "no state file"
    above). Each VM's MAC comes from `Client.DomainMAC`, read back from live
@@ -201,7 +206,7 @@ that are currently shut off, but leaves already-running VMs — and their disks
    while the node is still in Talos maintenance mode; a node that already has
    a config applied rejects it with `tls: certificate required` instead —
    there's no authenticated retry path today, so recovering from that means
-   `clusterctl destroy` (which now also removes the node's disk — see below)
+   `slayer destroy` (which now also removes the node's disk — see below)
    and re-provisioning from scratch.
 5. Bootstraps etcd on the *first* control-plane node, retrying up to 20
    times / 10s apart (the apiserver needs time after reboot) and treating
@@ -216,11 +221,11 @@ Output: `bootstrap complete, kubeconfig written to talos/kubeconfig`.
 > apiserver is healthy) — `no route to host` against the VIP for the first
 > ~30-60s is normal; poll rather than treat it as a failure.
 
-### `clusterctl addons`
+### `slayer addons`
 Two steps, both against `talos/kubeconfig` via
 `internal/k8s.ApplyManifest`/`ApplyManifestBytes` — a hand-rolled
 multi-document YAML apply built on `client-go`'s dynamic client + discovery
-REST mapper (field manager `"clusterctl"`, `Force: true`), so both are safe
+REST mapper (field manager `"slayer"`, `Force: true`), so both are safe
 to re-run:
 
 1. Installs MetalLB itself from the vendored, version-pinned
@@ -242,27 +247,70 @@ to re-run:
 > `node.kubernetes.io/exclude-from-external-load-balancers`, which MetalLB's
 > **speaker** DaemonSet honors by default. In a 3-worker homelab this can
 > matter if workers are down; the fix is patching `speaker` (not
-> `controller`!) with `--ignore-exclude-lb`. `clusterctl addons` does not do
+> `controller`!) with `--ignore-exclude-lb`. `slayer addons` does not do
 > this patch automatically — it's a manual `kubectl patch` step today.
 
-### `clusterctl status`
+### `slayer ceph`
+Installs Rook-Ceph and turns worker nodes' second raw disk (`/dev/vdb`, see
+`cluster.yaml`'s `worker.osdDiskGB` and
+`docs/superpowers/specs/2026-07-14-worker-osd-disk-design.md`) into usable
+Kubernetes storage. Refuses to run — before applying anything — if
+`cfg.Worker.OSDDiskGB` is 0, since there'd be no raw disk for OSDs to claim.
+
+1. Installs Rook from the vendored, version-pinned
+   `manifests/rook-ceph-operator.yaml` (CRDs, `rook-ceph` namespace/RBAC,
+   operator Deployment). Pinned to Rook v1.19.8 rather than the newer
+   v1.20.x line deliberately — v1.20 made a second "ceph-csi-operator"
+   (its own CRDs + Deployment) mandatory, which would mean two operators
+   and a CRD-ordering dependency between two vendored files. v1.19.8 still
+   supports classic in-operator CSI driver management via the
+   `ROOK_USE_CSI_OPERATOR` toggle, flipped to `"false"` in the vendored
+   copy (upstream default is `"true"`) — see that file's header comment for
+   upgrade instructions and what changes if a future pin removes classic
+   mode the way v1.20 did.
+2. Renders `manifests/rook-ceph-cluster.yaml.tmpl` — a `CephCluster` naming
+   every worker node (`talos-worker-01..NN`, from `cfg.Worker.Count`) with
+   device `vdb`, a `CephBlockPool` "replicapool", and a default RBD
+   `StorageClass` "rook-ceph-block" — and applies it, retrying up to 20
+   times / 3s apart. Retrying matters because these CRs can't be accepted
+   until Rook's CRDs (just installed in step 1) reach `Established`; the
+   first attempt failing is the expected common case, same as `addons`'s
+   MetalLB pool step.
+   - `mon.count` is 3 when there are >= 3 workers, else 1 (Ceph mons need an
+     odd quorum size).
+   - The pool's `replicated.size` is `min(3, worker count)` (`failureDomain:
+     host`, so it can't exceed the number of hosts). `requireSafeReplicaSize`
+     is disabled only when that clamps to 1 (a single-worker homelab
+     explicitly opting into no redundancy) — Ceph's own guard otherwise
+     rejects a size-1 pool outright.
+
+Returns once the CRs are accepted by the API server, **not** once Ceph
+reports `HEALTH_OK` — mons forming quorum and OSDs coming up takes real
+minutes. Poll `kubectl -n rook-ceph get cephcluster` for that.
+
+Out of scope today: Ceph dashboard, toolbox pod, CephFS, RGW object
+storage, Prometheus integration, and resizing/reshaping an already-installed
+`CephCluster` after `osdDiskGB` or `worker.count` changes (same caveat as
+the OSD-disk design's "no resize" note).
+
+### `slayer status`
 For each expected control-plane/worker node name, looks it up in libvirt and
 reports whether the domain exists/is running and its current DHCP IP (best
 effort — a domain that's down obviously has no lease). Purely read-only,
 libvirt-level — it does **not** check Kubernetes/Talos health.
 
-### `clusterctl stop`
+### `slayer stop`
 Gracefully shuts down (`DomainShutdown`, an ACPI power signal — Talos gets a
 chance to exit cleanly) every expected control-plane and worker domain,
 polling up to 12 times / 5s (~60s total) for it to reach the shut-off state.
 If a domain is still running once that budget is exhausted, it's forcibly
 powered off (`DomainDestroy`). Domains are **not** undefined — disks and
-config are left in place so a later `clusterctl provision` starts them again
+config are left in place so a later `slayer provision` starts them again
 without recreating anything. A domain that's already stopped or doesn't
 exist is left as-is. Continues past per-node failures and reports all of
 them at the end, same as `destroy`.
 
-### `clusterctl destroy --yes`
+### `slayer destroy --yes`
 Stops (`DomainDestroy`) and undefines (`DomainUndefineFlags`, clearing
 managed-save state and NVRAM) every expected control-plane and worker domain,
 **and deletes its backing qcow2 disk image** (`libvirt.DeleteDisk`). Disk
@@ -277,13 +325,13 @@ treated as success (nothing to do).
 > `EnsureDisk`/`EnsureDomain` are idempotent and leave an existing qcow2 or
 > domain untouched. Without deleting the disk, a "fresh" VM created after
 > `destroy` would silently reuse the old disk — which already has Talos
-> installed and its own PKI on it — and reject `clusterctl bootstrap`'s
+> installed and its own PKI on it — and reject `slayer bootstrap`'s
 > insecure/maintenance-mode config push with `tls: certificate required`
 > instead of accepting it as a new node. `destroy` followed by `bootstrap`
 > must produce a genuinely fresh install every time.
 
-### `clusterctl version`
-Prints `clusterctl dev`. The only subcommand that skips loading
+### `slayer version`
+Prints `slayer dev`. The only subcommand that skips loading
 `cluster.yaml` (see the `PersistentPreRunE` special-case in `main.go`).
 
 ---
@@ -292,20 +340,20 @@ Prints `clusterctl dev`. The only subcommand that skips loading
 
 ```
 make help          # list all targets with descriptions
-make build          # go build -> ./bin/clusterctl
-make install         # go install ./cmd/clusterctl (to $GOPATH/bin)
+make build          # go build -> ./bin/slayer
+make install         # go install ./cmd/slayer (to $GOPATH/bin)
 make test             # go test ./...
 make vet               # go vet ./...
 make fmt                 # go fmt ./...
 make tidy                 # go mod tidy
 make clean                 # rm -rf bin
 
-make provision       # ./bin/clusterctl provision
-make bootstrap        # ./bin/clusterctl bootstrap
-make addons            # ./bin/clusterctl addons
-make status              # ./bin/clusterctl status
-make stop                  # ./bin/clusterctl stop
-make destroy               # ./bin/clusterctl destroy --yes   (DESTRUCTIVE)
+make provision       # ./bin/slayer provision
+make bootstrap        # ./bin/slayer bootstrap
+make addons            # ./bin/slayer addons
+make status              # ./bin/slayer status
+make stop                  # ./bin/slayer stop
+make destroy               # ./bin/slayer destroy --yes   (DESTRUCTIVE)
 
 make kubeconfig      # print `export KUBECONFIG=.../talos/kubeconfig`
 make nodes             # kubectl get nodes -o wide  (KUBECONFIG=talos/kubeconfig)
@@ -377,7 +425,7 @@ make destroy
   extending these clients over shelling out — that's the pattern the whole
   codebase follows.
 - **Idempotency over state tracking**: there is intentionally no
-  `clusterctl.state.json` or similar. Every command re-derives truth from
+  `slayer.state.json` or similar. Every command re-derives truth from
   libvirt/disk on each invocation (`EnsureDomain`, `EnsureDefaultNetwork`,
   `GenerateConfigs`'s "reuse if present" check, `isAlreadyBootstrapped`,
   server-side-apply's inherent idempotency). Keep new features consistent
@@ -427,7 +475,7 @@ make destroy
   another manifest that needs a value already expressed in `cluster.yaml`,
   template it the same way rather than duplicating the literal.
 - **Installing a CRD/webhook and applying a CR it validates is two apply
-  calls with an inherent race, not one.** `clusterctl addons` applies
+  calls with an inherent race, not one.** `slayer addons` applies
   `metallb-native.yaml` (which creates MetalLB's controller Deployment and
   `ValidatingWebhookConfiguration`) and then the `IPAddressPool`/
   `L2Advertisement` CRs the webhook intercepts. The webhook's Service has no
@@ -443,7 +491,7 @@ make destroy
 - **`script.sh`** is the original bash prototype (kept for reference/diffing
   behavior) — the Go CLI is a faithful rewrite of the same sequence
   (network → VMs → IP discovery → gen config → apply → bootstrap →
-  kubeconfig), so if something in `clusterctl` behaves unexpectedly,
+  kubeconfig), so if something in `slayer` behaves unexpectedly,
   `script.sh`'s comments are a good source of "what was this supposed to
   do."
 
