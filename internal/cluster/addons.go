@@ -15,15 +15,21 @@ import (
 const (
 	metallbInstallManifest = "manifests/metallb-native.yaml"
 	metallbPoolTemplate    = "manifests/metal-lb.yaml.tmpl"
+	traefikInstallManifest = "manifests/traefik.yaml"
 )
 
 // Addons installs MetalLB (a pinned, vendored upstream manifest — see
 // manifests/metallb-native.yaml) and configures its IP pool from
-// cfg.Network.MetalLBRangeStart/End. Safe to re-run — server-side apply is
-// idempotent.
+// cfg.Network.MetalLBRangeStart/End, then installs Traefik and the Gateway
+// API CRDs (a pinned, vendored `helm template` output — see
+// manifests/traefik.yaml). Safe to re-run — server-side apply is idempotent.
 func Addons(ctx context.Context, cfg *config.Config, kubeconfigPath string) error {
 	if err := k8s.ApplyManifest(ctx, kubeconfigPath, metallbInstallManifest); err != nil {
 		return fmt.Errorf("installing metallb: %w", err)
+	}
+
+	if err := k8s.ApplyManifest(ctx, kubeconfigPath, traefikInstallManifest); err != nil {
+		return fmt.Errorf("installing traefik: %w", err)
 	}
 
 	poolYAML, err := renderMetalLBPool(cfg)

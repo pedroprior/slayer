@@ -1,19 +1,5 @@
-- [ ] Add `make update-traefik-manifest` target: regenerate manifests/traefik.yaml
-      via `helm template traefik traefik/traefik -n traefik --include-crds
-      --version $(TRAEFIK_CHART_VERSION) --set ports.web.port=80 --set
-      ports.websecure.port=443`, prepend a vendored-file header, bump
-      TRAEFIK_CHART_VERSION to 41.0.2 (latest, app v3.7.6).
-- [ ] Add `make update-metallb-manifest` target: regenerate
-      manifests/metallb-native.yaml via curl from the pinned METALLB_VERSION
-      (currently v0.16.0, already latest), prepend a vendored-file header.
-- [ ] Update .PHONY list and `make help` output for both new targets.
-- [ ] Verify the above (see task #1 / conversation for full checklist):
-      1. Determinism: run update-traefik-manifest twice, diff empty.
-      2. Regen-matches-recipe: TRAEFIK_CHART_VERSION=33.2.1 reproduces the
-         pre-change manifests/traefik.yaml byte-for-byte.
-      3. `kubectl apply --dry-run=client` on both regenerated manifests.
-      4. `make help` lists both new targets.
-      5. Live cluster: provision + bootstrap, apply traefik.yaml (41.0.2),
-         confirm pod Running, apply whoami-*.yaml, curl Host: whoami.localhost
-         routes correctly (watch for new RBAC verbs: pods/namespaces/configmaps).
-      6. update-metallb-manifest produces an empty git diff (v0.16.0 already latest).
+- cert-manager;
+- prometheus/grafana;
+- Uptime Kuma;
+- ArgoCD;
+- Homepage;

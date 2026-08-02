@@ -11,7 +11,7 @@ import (
 func newAddonsCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "addons",
-		Short: "Apply Kubernetes addon manifests (MetalLB)",
+		Short: "Apply Kubernetes addon manifests (MetalLB, Traefik)",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := cluster.Addons(cmd.Context(), cfg, "talos/kubeconfig"); err != nil {
 				return err
