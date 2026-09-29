@@ -19,15 +19,36 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
+// isCommentOnly reports whether every non-blank line of a (already
+// TrimSpace'd) YAML document is a "#" comment. `helm template
+// --include-crds` (used to vendor manifests/traefik.yaml) emits a
+// "# Source: ..." comment as its own document ahead of some resources;
+// such a document is non-empty but decodes to YAML null, which the k8s
+// decoder rejects.
+func isCommentOnly(doc []byte) bool {
+	for _, line := range bytes.Split(doc, []byte("\n")) {
+		trimmed := bytes.TrimSpace(line)
+		if len(trimmed) == 0 {
+			continue
+		}
+		if trimmed[0] != '#' {
+			return false
+		}
+	}
+	return true
+}
+
 // splitYAMLDocuments splits a multi-document YAML file on lines that are
 // exactly "---" (the YAML document separator), skipping any resulting empty
-// documents (e.g. a leading "---" or trailing "---" with nothing after it).
+// documents (e.g. a leading "---" or trailing "---" with nothing after it)
+// or documents that contain only comments.
 func splitYAMLDocuments(data []byte) ([][]byte, error) {
 	var docs [][]byte
 	var current bytes.Buffer
 
 	flush := func() {
-		if trimmed := bytes.TrimSpace(current.Bytes()); len(trimmed) > 0 {
+		trimmed := bytes.TrimSpace(current.Bytes())
+		if len(trimmed) > 0 && !isCommentOnly(trimmed) {
 			docs = append(docs, append([]byte{}, trimmed...))
 		}
 		current.Reset()

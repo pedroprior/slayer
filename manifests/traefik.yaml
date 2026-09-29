@@ -1,3 +1,15 @@
+# Vendored Traefik + Gateway API CRDs, generated via `helm template traefik
+# traefik/traefik -n traefik --include-crds` (see TO-DO for the pinned
+# chart version and exact command). `helm template` does not itself emit a
+# Namespace resource for the `-n traefik` target namespace, so this
+# Namespace is added by hand — all objects below (Deployment,
+# ServiceAccount, ClusterRoleBinding, ...) are scoped to it via `-n
+# traefik` and would otherwise fail to apply against a cluster that has
+# never run `helm install`.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: traefik
 ---
 # Source: traefik/crds/gateway-standard-install.yaml
 # Copyright 2024 The Kubernetes Authors.

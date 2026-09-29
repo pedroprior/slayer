@@ -53,7 +53,7 @@ provision: build download-talos-iso ## Create/start the control-plane and worker
 bootstrap: build ## Generate/apply Talos configs, bootstrap etcd, fetch kubeconfig
 	./bin/$(BIN) --config $(CONFIG) bootstrap
 
-addons: build ## Apply Kubernetes addon manifests (MetalLB)
+addons: build ## Apply Kubernetes addon manifests (MetalLB, Traefik)
 	./bin/$(BIN) --config $(CONFIG) addons
 
 ceph: build ## Install Rook-Ceph and claim worker OSD disks for storage (requires worker.osdDiskGB set)
